@@ -15,6 +15,8 @@
             
         </div>   
         <div>
+            <a href="#" class="text-white hover:underline mx-4">Welcome {{ user.username }}</a>
+            <a href="/blog-list" class="text-white hover:underline mx-4">Saved Blog Posts</a>
             <a href="#" class="text-white hover:underline">Logout</a>
         </div>
 
@@ -27,14 +29,15 @@
              <section>
                 <h2 class="text-xl mb-4 font-semibold">All Blog Posts</h2>
                 <div class="space-y-4">
-                    <div class="border border-gray-300 p-4 rounded-lg">
-                        <h3 class="text-lg font-semibold">Blog Post Title</h3>
-                        <p>This is the content of the blog post. Lorem ipsum dolor sit, amet consectetur adipisicing elit. </p>
-                    </div>
-                    <div class="border border-gray-300 p-4 rounded-lg">
-                        <h3 class="text-lg font-semibold">Blog Post Title 2</h3>
-                        <p>This is the content of the blog post. Lorem ipsum dolor sit, amet consectetur adipisicing elit. </p>
-                    </div>
+                    {% for article in blog_article reversed %}
+                    <a href="blog-details/{{article.id}}">
+                        <div class="border border-gray-300 p-4 rounded-lg">
+                            <h3 class="text-lg font-semibold">{{article.youtube_title}}</h3>
+                            <p>{{article.generated_content|truncatechars:80}} </p>
+                        </div>
+                    </a>
+                    {% endfor %}
+                    
                     <!-- Repeat -->
                 </div>
              </section>
