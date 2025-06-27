@@ -1,4 +1,7 @@
+import os
 import re
+import json
+import uuid
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import render, redirect
@@ -6,20 +9,14 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.conf import settings
-import json
 from dotenv import load_dotenv
-from pytube import YouTube
-import os
+import yt_dlp
 import assemblyai as aai
 import openai
 from .models import BlogPost
-import yt_dlp
-import uuid
-import os
 
 load_dotenv()
 
-# Create your views here.
 @login_required
 def index(request):
     return render(request, 'index.html')
@@ -62,8 +59,6 @@ def generate_blog(request):
     else:
         return JsonResponse({'error': 'Invalid request method'}, status=405)
 
-import yt_dlp
-
 def yt_title(link):
     try:
         with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
@@ -72,14 +67,11 @@ def yt_title(link):
     except Exception as e:
         print(f"yt-dlp error: {e}")
         return None
-    
+
 def download_audio(link, output_path):
     """
     Download the audio from a YouTube video using yt-dlp, save as mp3, and return the file path.
     """
-    
-
-    # Generate a unique filename to avoid conflicts
     unique_id = uuid.uuid4().hex
     output_template = os.path.join(output_path, f"{unique_id}.%(ext)s")
     ydl_opts = {
@@ -117,27 +109,25 @@ def get_transcription(link):
     aai.settings.api_key = os.getenv("ASSEMBLYAI_API_KEY")
     transcriber = aai.Transcriber()
     transcript = transcriber.transcribe(audio_file)
-
     return transcript.text if transcript and hasattr(transcript, "text") else None
 
 def generate_blog_from_transcription(transcription):
-    import openai
     openai.api_key = os.getenv("OPENAI_API_KEY")
-
-    prompt = f"Based on the following transcript from a YouTube video, write a comprehensive blog article, write it based on the transcript, but dont make it look like a youtube video, make it look like a proper blog article:\n\n{transcription}\n\nArticle:"
-
-    response = openai.chat.completions.create(
+    prompt = (
+        "Based on the following transcript from a YouTube video, write a comprehensive blog article. "
+        "Write it based on the transcript, but don't make it look like a YouTube video, make it look like a proper blog article:\n\n"
+        f"{transcription}\n\nArticle:"
+    )
+    response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",  # or "gpt-4" if you have access
         messages=[
-            {"role": "system", "content": "You are a helpful assistant that writes blog articles."},
-            {"role": "user", "content": prompt},
+            {"role": "system", "content": "You are a helpful assistant who writes excellent blog articles."},
+            {"role": "user", "content": prompt}
         ],
-        max_tokens=1000,
+        max_tokens=2048,
         temperature=0.7,
     )
-
-    generated_content = response.choices[0].message.content.strip()
-    return generated_content
+    return response.choices[0].message["content"].strip()
 
 def blog_list(request):
     blog_articles = BlogPost.objects.filter(user=request.user)
