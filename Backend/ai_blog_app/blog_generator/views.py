@@ -40,8 +40,8 @@ def generate_blog(request):
         if not transcription:
             return JsonResponse({'error': "Failed to get transcript. Could not download audio or transcribe."}, status=500)
 
-        # use OpenAI to generate the blog
-        blog_content = generate_blog_from_transcription(transcription)
+        # use Groq to generate the blog
+        blog_content = generate_blog_from_transcription_groq(transcription)
         if not blog_content:
             return JsonResponse({'error': "Failed to generate blog article"}, status=500)
 
@@ -69,9 +69,6 @@ def yt_title(link):
         return None
 
 def download_audio(link, output_path):
-    """
-    Download the audio from a YouTube video using yt-dlp, save as mp3, and return the file path.
-    """
     unique_id = uuid.uuid4().hex
     output_template = os.path.join(output_path, f"{unique_id}.%(ext)s")
     ydl_opts = {
@@ -90,7 +87,6 @@ def download_audio(link, output_path):
             audio_path = output_template.replace('%(ext)s', 'mp3')
             if os.path.exists(audio_path):
                 return audio_path
-            # Sometimes yt-dlp returns another name, so use info
             downloaded_file = ydl.prepare_filename(info)
             base, ext = os.path.splitext(downloaded_file)
             new_file = base + '.mp3'
@@ -104,30 +100,36 @@ def download_audio(link, output_path):
 def get_transcription(link):
     audio_file = download_audio(link, settings.MEDIA_ROOT)
     if not audio_file:
-        return None  # Ensure you handle download failure
+        return None
 
     aai.settings.api_key = os.getenv("ASSEMBLYAI_API_KEY")
     transcriber = aai.Transcriber()
     transcript = transcriber.transcribe(audio_file)
     return transcript.text if transcript and hasattr(transcript, "text") else None
 
-def generate_blog_from_transcription(transcription):
-    openai.api_key = os.getenv("OPENAI_API_KEY")
+
+def generate_blog_from_transcription_groq(transcription):
+    client=openai.OpenAI(
+        api_key=os.getenv("GROQ_API_KEY"),
+        base_url="https://api.groq.com/openai/v1"
+    )
     prompt = (
         "Based on the following transcript from a YouTube video, write a comprehensive blog article. "
         "Write it based on the transcript, but don't make it look like a YouTube video, make it look like a proper blog article:\n\n"
         f"{transcription}\n\nArticle:"
     )
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",  # or "gpt-4" if you have access
+    response=client.chat.completions.create(
+        model="llama3-70b-8192",
         messages=[
-            {"role": "system", "content": "You are a helpful assistant who writes excellent blog articles."},
-            {"role": "user", "content": prompt}
+            {"role":"system","content":"You are a helpful assistant who writes excellent blog articles."},
+            {"role":"user","content":prompt}
         ],
         max_tokens=2048,
         temperature=0.7,
+        
     )
-    return response.choices[0].message["content"].strip()
+    return response.choices[0].message.content.strip()
+
 
 def blog_list(request):
     blog_articles = BlogPost.objects.filter(user=request.user)
